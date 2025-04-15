@@ -153,7 +153,7 @@ class Stats:
 
     def is_client_in_coverage(self, client):
         xs, ys = self.area
-        return xs[0] <= client.x <= xs[1] and ys[0] <= client.y <= ys[1]
+        return True if xs[0] <= client.x <= xs[1] and ys[0] <= client.y <= ys[1] else False
 
     def adjust_base_station_capacity(self):
         """Adjust base station capacity using Bayesian optimization."""
