@@ -11,7 +11,6 @@ class Stats:
         self.base_stations = base_stations
         self.clients = clients
         self.area = area
-        #self.graph = graph
 
         # Stats
         self.total_connected_users_ratio = []
@@ -27,9 +26,9 @@ class Stats:
         self.base_station_capacities = {bs.pk: [] for bs in base_stations}  # Track capacity over time
         self.optimization_space = [Real(0.1, 2.0, name=f"scale_bs_{bs.pk}") for bs in base_stations]
         self.optimization_results = []
-        self.block_ratio_upper_threshold = 0.3  # Example upper threshold
-        self.block_ratio_lower_threshold = 0.1  # Example lower threshold
-        self.capacity_adjustment_factor = 0.1  # Adjust capacity by 10%
+        self.block_ratio_upper_threshold = 0.03  # Example upper threshold
+        self.block_ratio_lower_threshold = 0.01  # Example lower threshold
+        self.capacity_adjustment_factor = 0.3  # Adjust capacity by 10%
 
     def get_stats(self):
         return (
@@ -106,10 +105,7 @@ class Stats:
             if self.is_client_in_coverage(c):
                 t += c.connected
                 cc += 1
-        # for bs in self.base_stations:
-        #     for sl in bs.slices:
-        #         t += sl.connected_users
-        return t/cc if cc != 0 else 0
+        return t / cc if cc != 0 else 0
 
     def get_total_used_bw(self):
         t = 0
@@ -124,9 +120,7 @@ class Stats:
             for sl in bs.slices:
                 c += sl.capacity.capacity
                 t += sl.capacity.capacity - sl.capacity.level
-                #c += 1
-                #t += (sl.capacity.capacity - sl.capacity.level) / sl.capacity.capacity
-        return t/c if c !=0 else 0
+        return t / c if c != 0 else 0
 
     def get_avg_slice_client_count(self):
         t, c = 0, 0
@@ -134,8 +128,8 @@ class Stats:
             for sl in bs.slices:
                 c += 1
                 t += sl.connected_users
-        return t/c if c !=0 else 0
-    
+        return t / c if c != 0 else 0
+
     def get_coverage_ratio(self):
         t, cc = 0, 0
         for c in self.clients:
@@ -143,7 +137,7 @@ class Stats:
                 cc += 1
                 if c.base_station is not None and c.base_station.coverage.is_in_coverage(c.x, c.y):
                     t += 1
-        return t/cc if cc !=0 else 0
+        return t / cc if cc != 0 else 0
 
     def incr_connect_attempt(self, client):
         if self.is_client_in_coverage(client):
@@ -159,7 +153,7 @@ class Stats:
 
     def is_client_in_coverage(self, client):
         xs, ys = self.area
-        return True if xs[0] <= client.x <= xs[1] and ys[0] <= client.y <= ys[1] else False
+        return xs[0] <= client.x <= xs[1] and ys[0] <= client.y <= ys[1]
 
     def adjust_base_station_capacity(self):
         """Adjust base station capacity using Bayesian optimization."""
@@ -192,3 +186,50 @@ class Stats:
                     sl.capacity.get(current_capacity - new_capacity)  # Reduce the capacity
                 sl.capacity._capacity = new_capacity  # Update the internal capacity value
                 print(f"Optimized capacity for slice {sl.name} at BaseStation {bs.pk}. New capacity: {sl.capacity.capacity}")
+
+    def dynamic_adjustment_loop(self):
+        """Dynamically adjust thresholds and capacity adjustment factor."""
+        while True:
+            yield self.env.timeout(5)  # Adjust every 5 simulation seconds (more frequent adjustments)
+
+            # Calculate recent average block ratio
+            if len(self.block_count) > 5:  # Use the last 5 block ratios for quicker responsiveness
+                recent_block_ratio = mean(self.block_count[-5:])
+            else:
+                recent_block_ratio = mean(self.block_count) if self.block_count else 0
+
+            # Adjust thresholds based on recent block ratio
+            if recent_block_ratio > self.block_ratio_upper_threshold:
+                self.block_ratio_upper_threshold += 0.005  # Increase upper threshold more responsively
+                self.capacity_adjustment_factor += 0.005  # Increase adjustment factor more responsively
+            elif recent_block_ratio < self.block_ratio_lower_threshold:
+                self.block_ratio_lower_threshold -= 0.005  # Decrease lower threshold more responsively
+                self.capacity_adjustment_factor -= 0.005  # Decrease adjustment factor more responsively
+
+            # Ensure thresholds and adjustment factor remain within valid bounds
+            self.block_ratio_upper_threshold = max(0.01, min(0.1, self.block_ratio_upper_threshold))
+            self.block_ratio_lower_threshold = max(0.001, min(0.05, self.block_ratio_lower_threshold))
+            self.capacity_adjustment_factor = max(0.1, min(1.0, self.capacity_adjustment_factor))
+
+            print(f"[{int(self.env.now)}] Adjusted thresholds: upper={self.block_ratio_upper_threshold:.3f}, "
+                  f"lower={self.block_ratio_lower_threshold:.3f}, adjustment_factor={self.capacity_adjustment_factor:.3f}")
+
+def optimize_thresholds(stats):
+    def objective(params):
+        upper_threshold, lower_threshold, adjustment_factor = params
+        stats.block_ratio_upper_threshold = upper_threshold
+        stats.block_ratio_lower_threshold = lower_threshold
+        stats.capacity_adjustment_factor = adjustment_factor
+
+        # Run a simulation and return the average block ratio
+        avg_block_ratio = stats.run_simulation()  # Replace with actual simulation logic
+        return avg_block_ratio
+
+    space = [
+        Real(0.01, 0.1, name='block_ratio_upper_threshold'),
+        Real(0.001, 0.05, name='block_ratio_lower_threshold'),
+        Real(0.1, 1.0, name='capacity_adjustment_factor')
+    ]
+
+    result = gp_minimize(objective, space, n_calls=20, random_state=42)
+    return result.x  # Optimal parameters
