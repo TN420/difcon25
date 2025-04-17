@@ -156,3 +156,35 @@ class Graph:
         y_max = max([bs.coverage.center[1]+bs.coverage.radius for bs in self.base_stations])
 
         return (x_min, x_max), (y_min, y_max)
+
+    def plot_average_consume_time(self, clients, output_filename='average_consume_time.png'):
+        import matplotlib.pyplot as plt
+
+        # Filter clients with connected time > 0 and consume time > 0
+        filtered_clients = [c for c in clients if c.total_connected_time > 0 and c.total_consume_time > 0]
+        if not filtered_clients:
+            print("No clients with valid connected and consume times.")
+            return
+
+        # Separate clients by slice type
+        iot_clients = [c for c in filtered_clients if c.get_slice() and c.get_slice().name == "iot"]
+        data_clients = [c for c in filtered_clients if c.get_slice() and c.get_slice().name == "data"]
+
+        # Calculate average consume time
+        iot_avg_consume_times = [c.total_consume_time / c.total_connected_time for c in iot_clients]
+        data_avg_consume_times = [c.total_consume_time / c.total_connected_time for c in data_clients]
+
+        # Plot
+        plt.figure(figsize=(10, 6))
+        if iot_clients:
+            plt.plot([c.pk for c in iot_clients], iot_avg_consume_times, marker='o', color='blue', linestyle='-', label='IoT Slice')
+        if data_clients:
+            plt.plot([c.pk for c in data_clients], data_avg_consume_times, marker='x', color='green', linestyle='--', label='Data Slice')
+
+        plt.xlabel('Client ID')
+        plt.ylabel('Average Consume Time')
+        plt.title('Average Consume Time by Slice Type')
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(output_filename)
+        print(f"Average consume time plot saved as {output_filename}.")

@@ -1,7 +1,7 @@
 # YAML config file
 
 settings:
-  simulation_time: 180
+  simulation_time: 600
   num_clients: 1000
   limit_closest_base_stations: 1
   statistics_params:
@@ -13,7 +13,7 @@ settings:
     y:
       min: -1000
       max: 1000
-  logging: False
+  logging: True
   log_file: output.txt
   
   plotting_params:

@@ -57,6 +57,12 @@ class Client:
             if self.usage_remaining <= 0:
                 self.disconnect()
 
+        # Track connected/unconnected time
+        if self.connected:
+            self.total_connected_time += 0.25
+        else:
+            self.total_unconnected_time += 0.25
+
         yield self.env.timeout(0.25)
 
         # .75: Move

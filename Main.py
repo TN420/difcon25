@@ -187,4 +187,7 @@ if SETTINGS['plotting_params']['plotting']:
     if SETTINGS['plotting_params']['plot_show']:
         graph.show_plot()
 
+    # Plot average consume time for clients with connected time > 0
+    graph.plot_average_consume_time(clients, output_filename='average_consume_time.png')
+
 sys.stdout = sys.__stdout__
